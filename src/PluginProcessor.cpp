@@ -302,7 +302,12 @@ void HartermistProcessor::handleMidi(const juce::MidiMessage &m)
         float v = (float)m.getControllerValue() / 127.0f;
         switch (cc) {
         case 1: engine.modWheel(v); break;
-        case 74: engine.cc74(ch, v); break;
+        case 74: {
+            /* (64 exactly the middle: 0..64 to 0..0.5, 64..127 to 0.5..1) */
+            int x = m.getControllerValue();
+            engine.cc74(ch, x <= 64 ? (float)x / 128.0f : 0.5f + (float)(x - 64) / 126.0f);
+            break;
+        }
         case 120: engine.panic(); break;
         case 123:
             engine.allOff();
@@ -312,6 +317,7 @@ void HartermistProcessor::handleMidi(const juce::MidiMessage &m)
             engine.bend(ch, 0.0f);
             engine.modWheel(0.0f);
             engine.chanPressure(ch, 0.0f);
+            engine.cc74(ch, 0.5f);               /* (back to 64: the middle, where it moves nothing) */
             engine.sustain(false);
             break;
         default: break;

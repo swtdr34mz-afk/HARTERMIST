@@ -16,7 +16,7 @@
  *   after      the voices' sum (odd voices left, even right: SPREAD), the 12 dB stereo high-pass (CUT, RES), then the
  *              four effect pages, PRESET LEVEL
  *   matrix     LFO 1, LFO 2, the VCA EG, the filter EG, velocity, the mod wheel, aftertouch (poly or channel), key
- *              track and CC74, each to any knob or slider (-100..+100); per voice, and for the global ones (the high
+ *              track and CC74 (centred on 64: there it moves nothing), each to any knob or slider (-100..+100); per voice, and for the global ones (the high
  *              pass, SPREAD, the effects' sliders) their monophonic versions
  *   playing    the clock (PLAY / STOP, or the host's), the arpeggiator (UP, DOWN, ORD, INC, EXC, RND; DIV, PROB,
  *              SWNG, GATE; REC holds), the poly sequencer (64 steps of six notes, ties and rests; STEPS, DIV, PROB,

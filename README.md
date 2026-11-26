@@ -43,10 +43,12 @@ xattr -cr ~/Library/Audio/Plug-Ins/VST3/HARTERMIST.vst3 ~/Library/Audio/Plug-Ins
 - **MENU**: Play Mode (Poly, Tri, Duo, Unison, Mono), VCO 1 Tune, Drive, Legato, Glide, Preset Level, Instability,
   Delays BPM Sync, Amp Velocity, Pitch Wheel; **Mod Matrix**; Global (MPE, Host-Sync, Qualität); Initialize.
 - **Mod Matrix** wie am Artemis: MENU → Mod Matrix → eine Quelle (LFO 1, LFO 2, VCA EG, Filter EG, Velocity, Modwheel,
-  Aftertouch, Key Track, CC74). Dann einfach Regler und Fader bewegen: das stellt die Stärke dieser Quelle auf diesem
+  Aftertouch, Key Track, CC74 – bei 64 bewegt CC74 nichts, darunter runter, darüber rauf). Dann einfach Regler und Fader bewegen: das stellt die Stärke dieser Quelle auf diesem
   Regler ein (−100…+100, ein blauer Bogen zeigt sie). Doppelklick: zurück auf 0. MENU nochmal: fertig.
 - **SAVE**: der Sound als eigenes Programm (in `Dokumente/HARTERMIST/Programs`).
 - Doppelklick auf einen Regler: Grundwert. Shift beim Ziehen: fein.
+- **Rechtsklick** auf einen Regler, Fader oder Knopf: das Menü der DAW für diesen Parameter (MIDI Learn, Automation …).
+  Ein Rechtsklick verändert nie den Wert.
 
 ## What it has
 

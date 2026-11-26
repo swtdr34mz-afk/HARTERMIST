@@ -1,13 +1,4 @@
-The first release of HARTERMIST: a 6- or 8-voice analog-style polysynth in the manner of the Dreadbox Artemis (VST3 for Windows and the Mac, AU, standalone).
+HARTERMIST 1.0.1
 
-- Two morphing VCOs (saw → square → triangle) with hard sync and through-zero FM, sub / noise
-- The creamy 24 / 12 dB low-pass with drive and audio-rate filter FM, the stereo high-pass
-- Two ADSR, two LFOs per voice (8 waves, key / BPM sync, XMOD), the mod matrix (9 sources to every control)
-- POLY, TRI, DUO, UNISON, MONO; 6 voices as the Artemis, or 8
-- All 37 effect algorithms of DIST, MOD, DELAY and REV
-- Arpeggiator and 64-step poly sequencer with probability and swing, MPE
-- Each voice built like an analog circuit: its own component tolerances, drift and warmth
-- A photo-real panel, with the wear of an instrument that gets played
-- 38 programs
-
-Unofficial: not made, endorsed or supported by Dreadbox.
+- Right-click any knob, slider or button: the host's own menu for that parameter (MIDI learn, automation, ...). A right click never changes a value, a right drag moves nothing.
+- CC74 as a mod matrix source is centred on 64: at 64 it moves nothing, under 64 down, over 64 up (FL Studio and controllers such as the Launchkey send CC74 = 64 with their notes). CC121 sets it back to 64.

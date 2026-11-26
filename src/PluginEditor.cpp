@@ -20,6 +20,18 @@ juce::RangedAudioParameter *paramOf(HartermistProcessor &proc, int p)
     return p >= 0 ? proc.param(p) : nullptr;
 }
 
+/* a right click: the host's own menu for the parameter (MIDI learn, automation, ...); it never changes the value.
+ * (In the standalone app, or a host without such a menu: nothing.) */
+void hostMenu(juce::Component &c, juce::RangedAudioParameter *p)
+{
+    if (p == nullptr)
+        return;
+    if (auto *ed = c.findParentComponentOfClass<juce::AudioProcessorEditor>())
+        if (auto *ctx = ed->getHostContext())
+            if (auto menu = ctx->getContextMenuForParameter(p))
+                menu->showNativeMenu(ed->getMouseXYRelative());
+}
+
 /* ------------------------------------------------------------------- what a control does when moved --- */
 /* (the value, or with the matrix being set, that source's amount on it) */
 struct Mover {
@@ -157,6 +169,12 @@ public:
     }
     void mouseDown(const juce::MouseEvent &e) override
     {
+        rightClick = e.mods.isPopupMenu();
+        if (rightClick) {
+            if (kind != 2)
+                hostMenu(*this, paramOf(mv.panel.proc, mv.which()));
+            return;
+        }
         startY = e.position.y;
         acc = 0.0f;
         if (kind == 2)
@@ -165,6 +183,8 @@ public:
     }
     void mouseDrag(const juce::MouseEvent &e) override
     {
+        if (rightClick || e.mods.isPopupMenu())
+            return;
         float dy = startY - e.position.y;
         if (kind == 2) {                         /* the encoder: a detent every 14 px */
             while (dy - acc >= 14.0f) {
@@ -181,6 +201,10 @@ public:
     }
     void mouseUp(const juce::MouseEvent &e) override
     {
+        if (rightClick) {
+            rightClick = false;
+            return;
+        }
         if (kind == 2) {
             if (e.getDistanceFromDragStart() < 4 && onPress)
                 onPress(e);
@@ -198,9 +222,9 @@ public:
         else
             mv.step(d);
     }
-    void mouseDoubleClick(const juce::MouseEvent &) override
+    void mouseDoubleClick(const juce::MouseEvent &e) override
     {
-        if (kind != 2)
+        if (kind != 2 && !e.mods.isPopupMenu())
             mv.reset();
     }
     std::function<void(int)> onTurn;
@@ -240,6 +264,7 @@ private:
     }
     Mover mv;
     int kind;
+    bool rightClick = false;
     float d;
     uint32_t seed;
     float angleOff, paint_;
@@ -287,12 +312,33 @@ public:
     }
     void mouseDown(const juce::MouseEvent &e) override
     {
+        rightClick = e.mods.isPopupMenu();
+        if (rightClick) {
+            hostMenu(*this, paramOf(mv.panel.proc, mv.which()));
+            return;
+        }
         startY = e.position.y;
         mv.begin();
     }
-    void mouseDrag(const juce::MouseEvent &e) override { mv.move((startY - e.position.y) / ((FB - FT) * (e.mods.isShiftDown() ? 4.0f : 1.0f))); }
-    void mouseUp(const juce::MouseEvent &) override { mv.end(); }
-    void mouseDoubleClick(const juce::MouseEvent &) override { mv.reset(); }
+    void mouseDrag(const juce::MouseEvent &e) override
+    {
+        if (rightClick || e.mods.isPopupMenu())
+            return;                              /* (a right drag moves nothing) */
+        mv.move((startY - e.position.y) / ((FB - FT) * (e.mods.isShiftDown() ? 4.0f : 1.0f)));
+    }
+    void mouseUp(const juce::MouseEvent &) override
+    {
+        if (rightClick) {
+            rightClick = false;
+            return;
+        }
+        mv.end();
+    }
+    void mouseDoubleClick(const juce::MouseEvent &e) override
+    {
+        if (!e.mods.isPopupMenu())
+            mv.reset();
+    }
     void mouseWheelMove(const juce::MouseEvent &, const juce::MouseWheelDetails &w) override
     {
         int d = w.deltaY > 0 ? 1 : w.deltaY < 0 ? -1 : 0;
@@ -303,6 +349,7 @@ public:
 private:
     float capY(float v) const { return (FB - (FB - FT) * v) - (float)getY() * 0.0f - top0; }
     Mover mv;
+    bool rightClick = false;
     uint32_t seed;
     float jx;
     juce::Image cap;
@@ -319,8 +366,8 @@ class Btn : public juce::Component, public Panel::Live
 public:
     Btn(std::function<void()> press, std::function<float()> lit, uint32_t seed = 1) : onPress(std::move(press)), isLit(std::move(lit)), seed(seed) {}
     bool hitTest(int x, int y) override { return getLocalBounds().toFloat().getCentre().getDistanceFrom({(float)x, (float)y}) <= 19.0f; }
-    std::function<void(const juce::MouseEvent &)> onRight;
     std::function<void()> onLong;
+    juce::RangedAudioParameter *param = nullptr;   /* (its parameter: a right click opens the host's menu for it) */
     void setPress(std::function<void()> f) { onPress = std::move(f); }
     void paint(juce::Graphics &g) override
     {
@@ -358,9 +405,9 @@ public:
     }
     void mouseDown(const juce::MouseEvent &e) override
     {
-        if (e.mods.isPopupMenu() && onRight) {
-            onRight(e);
-            return;
+        if (e.mods.isPopupMenu()) {
+            hostMenu(*this, param);
+            return;                              /* (a right click never presses it) */
         }
         down = true;
         downAt = Panel::now();
@@ -369,8 +416,10 @@ public:
         if (!onLong && onPress)
             onPress();
     }
-    void mouseUp(const juce::MouseEvent &) override
+    void mouseUp(const juce::MouseEvent &e) override
     {
+        if (e.mods.isPopupMenu() && !down)
+            return;
         if (down && onLong && !longDone && onPress)
             onPress();
         down = false;
@@ -396,7 +445,7 @@ public:
     std::function<void(const juce::MouseEvent &)> onClick;
     void mouseDown(const juce::MouseEvent &e) override
     {
-        if (onClick)
+        if (onClick && !e.mods.isPopupMenu())     /* (no parameter of its own: a right click does nothing) */
             onClick(e);
     }
     void mouseWheelMove(const juce::MouseEvent &, const juce::MouseWheelDetails &w) override
@@ -957,6 +1006,11 @@ void Panel::build()
         hot.push_back({x, y});
         return b;
     };
+    auto pbutton = [&](int p, float x, float y, std::function<void()> press, std::function<float()> lit) {
+        auto *b = button(x, y, std::move(press), std::move(lit));
+        b->param = proc.param(p);
+        return b;
+    };
     auto cycle = [this](int p) {
         return [this, p] {
             int n = PARAMS[p].hi - PARAMS[p].lo + 1;
@@ -972,15 +1026,15 @@ void Panel::build()
     knob(240, 157, P(P_L2_XMOD), 60);
     knob(240, 312, P(P_L2_RATE), 60);
     /* 1/2: VCO 1 (lit), VCO 2 (flashing), both (off) */
-    button(67, 424, cycle(P_L1_TGT), [this] {
+    pbutton(P_L1_TGT, 67, 424, cycle(P_L1_TGT), [this] {
         int t = proc.value(P_L1_TGT);
         return t == LT_VCO1 ? 1.0f : t == LT_VCO2 ? blink(400.0) : 0.0f;
     });
     /* WAV: the LFO's shape, the button showing it move */
-    button(140, 424, cycle(P_L1_WAV), [this] { return 0.15f + 0.85f * (0.5f + 0.5f * proc.lfoNow[0].load()); });
-    button(212, 424, cycle(P_L2_WAV), [this] { return 0.15f + 0.85f * (0.5f + 0.5f * proc.lfoNow[1].load()); });
+    pbutton(P_L1_WAV, 140, 424, cycle(P_L1_WAV), [this] { return 0.15f + 0.85f * (0.5f + 0.5f * proc.lfoNow[0].load()); });
+    pbutton(P_L2_WAV, 212, 424, cycle(P_L2_WAV), [this] { return 0.15f + 0.85f * (0.5f + 0.5f * proc.lfoNow[1].load()); });
     /* SYNC: free (off), key (flashing), BPM (lit), BPM + key (flashing, mostly on) */
-    button(284, 424, cycle(P_LFO_SYNC), [this] {
+    pbutton(P_LFO_SYNC, 284, 424, cycle(P_LFO_SYNC), [this] {
         int s = proc.value(P_LFO_SYNC);
         return s == LS_KEY ? blink(500.0) : s == LS_BPM ? 1.0f : s == LS_BPMKEY ? blink(500.0, 0.75f) : 0.0f;
     });
@@ -993,8 +1047,8 @@ void Panel::build()
     knob(404, 158, P(P_SUBNOISE), 48);
     knob(655, 155, P(P_VCOMIX), 48);
     knob(530, 297, P(P_WAVE), 86, 1);
-    button(390, 424, [this] { proc.setValue(P_SYNC, proc.value(P_SYNC) ? 0 : 1); touch(P_SYNC); }, onOff(P_SYNC));
-    button(678, 424, [this] { proc.setValue(P_FM_ENV, proc.value(P_FM_ENV) ? 0 : 1); touch(P_FM_ENV); }, onOff(P_FM_ENV));
+    pbutton(P_SYNC, 390, 424, [this] { proc.setValue(P_SYNC, proc.value(P_SYNC) ? 0 : 1); touch(P_SYNC); }, onOff(P_SYNC));
+    pbutton(P_FM_ENV, 678, 424, [this] { proc.setValue(P_FM_ENV, proc.value(P_FM_ENV) ? 0 : 1); touch(P_FM_ENV); }, onOff(P_FM_ENV));
     fader(385, P(P_VCO2));
     fader(458, P(P_DTN));
     fader(530, P(P_GLD));
@@ -1004,12 +1058,12 @@ void Panel::build()
     /* VCF */
     knob(830, 180, P(P_CUT), 88, 1);
     knob(968, 280, P(P_RES), 58);
-    button(785, 336, [this] { proc.setValue(P_LP12, proc.value(P_LP12) ? 0 : 1); touch(P_LP12); }, onOff(P_LP12));
-    button(855, 336, cycle(P_TRACK), [this] {
+    pbutton(P_LP12, 785, 336, [this] { proc.setValue(P_LP12, proc.value(P_LP12) ? 0 : 1); touch(P_LP12); }, onOff(P_LP12));
+    pbutton(P_TRACK, 855, 336, cycle(P_TRACK), [this] {
         int t = proc.value(P_TRACK);
         return t == TR_FULL ? 1.0f : t == TR_HALF ? blink(400.0) : 0.0f;
     });
-    button(1000, 424, [this] { proc.setValue(P_FFM_NOISE, proc.value(P_FFM_NOISE) ? 0 : 1); touch(P_FFM_NOISE); }, onOff(P_FFM_NOISE));
+    pbutton(P_FFM_NOISE, 1000, 424, [this] { proc.setValue(P_FFM_NOISE, proc.value(P_FFM_NOISE) ? 0 : 1); touch(P_FFM_NOISE); }, onOff(P_FFM_NOISE));
     fader(783, P(P_HP_CUT));
     fader(857, P(P_HP_RES));
     fader(930, P(P_F_ENV));
@@ -1030,10 +1084,7 @@ void Panel::build()
             proc.setValue(P_ENV_SHARED, proc.value(P_ENV_SHARED) ? 0 : 1);
             touch(P_ENV_SHARED);
         };
-        b->onRight = [this](const juce::MouseEvent &) {
-            proc.setValue(P_ENV_SHARED, proc.value(P_ENV_SHARED) ? 0 : 1);
-            touch(P_ENV_SHARED);
-        };
+        b->param = proc.param(P_ENV_SHARED);
         const int fe[4] = {P_FE_A, P_FE_D, P_FE_S, P_FE_R}, ae[4] = {P_AE_A, P_AE_D, P_AE_S, P_AE_R};
         const float xs[4] = {1103, 1180, 1255, 1328};
         for (int i = 0; i < 4; i++)

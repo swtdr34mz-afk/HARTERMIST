@@ -321,6 +321,35 @@ static void testMpeAndMatrix()
           ob.rms(12000, 24000), oa.rms(12000, 24000));
 }
 
+static void testCc74()
+{
+    /* CC74 on the cutoff through the matrix: at 64 nothing moves (the knob's sound exactly), under 64 it closes, over
+     * it opens; CC121's 64 again */
+    Program p;
+    programInit(p);
+    p.p[P_CUT] = 450;
+    p.p[P_INSTAB] = 0;
+    auto run = [&](bool route, float cc) {
+        Program q = p;
+        if (route)
+            q.mod[MS_CC74][P_CUT] = 40;
+        Engine e;
+        e.prepare(48000.0);
+        e.setProgram(q);
+        if (cc >= 0.0f)
+            e.cc74(1, cc);
+        e.noteOn(1, 48, 0.8f);
+        Out o;
+        render(e, o, 24000);
+        return o.rms(12000, 24000);
+    };
+    float plain = run(false, -1.0f), mid = run(true, 64.0f / 127.0f), lo = run(true, 0.0f), hi = run(true, 1.0f),
+          none = run(true, -1.0f);
+    CHECK(std::fabs(mid / plain - 1.0f) < 0.02f, "CC74 at 64 moves the cutoff (%.4f / %.4f)", mid, plain);
+    CHECK(std::fabs(none / plain - 1.0f) < 0.02f, "CC74 unsent moves the cutoff (%.4f / %.4f)", none, plain);
+    CHECK(lo < plain * 0.8f && hi > plain * 1.2f, "CC74 does not move the cutoff both ways (%.4f %.4f %.4f)", lo, plain, hi);
+}
+
 static void testBlocks()
 {
     /* any buffer size: the same sound */
@@ -349,6 +378,7 @@ int main()
     testEightVoices();
     testArpSeq();
     testMpeAndMatrix();
+    testCc74();
     testBlocks();
     std::printf(fails ? "%d FAILED\n" : "all passed\n", fails);
     return fails;
