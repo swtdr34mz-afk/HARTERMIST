@@ -141,7 +141,7 @@ const char *fxSliderName(int page, int t, int s)
     static const char *const BBD[5] = {"TIME", "FEED", "SPD", "DPTH", "MIX"};
     static const char *const REP[5] = {"SIZE", "REP", "PROB", "EG", "MIX"};
     static const char *const ROOM[5] = {"PRE", "SIZE", "FEED", "DAMP", "MIX"};
-    static const char *const HUGE[5] = {"SIZE", "FEED", "SPD", "DPTH", "MIX"};
+    static const char *const HUGEREV[5] = {"SIZE", "FEED", "SPD", "DPTH", "MIX"};
     static const char *const CLOUD[5] = {"TUNE", "SIZE", "FEED", "GRAIN", "MIX"};
     static const char *const SHIM[5] = {"TUNE", "SIZE", "FEED", "DAMP", "MIX"};
     s = s < 0 ? 0 : s > 4 ? 4 : s;
@@ -150,7 +150,7 @@ const char *fxSliderName(int page, int t, int s)
     case FP_MOD: return t == MT_NOTCH ? NOTCH[s] : t == MT_PITCH ? PITCH[s] : t == MT_RESONATOR ? RESO[s] : MODC[s];
     case FP_DELAY:
         return t == DL_STEREO ? STEREO[s] : t == DL_PINGPONG ? PING[s] : t == DL_BBD ? BBD[s] : t == DL_PLAYGROUND ? RESO[s] : REP[s];
-    default: return t == RV_HUGE ? HUGE[s] : t == RV_CLOUD ? CLOUD[s] : t == RV_SHIMMER ? SHIM[s] : ROOM[s];
+    default: return t == RV_HUGE ? HUGEREV[s] : t == RV_CLOUD ? CLOUD[s] : t == RV_SHIMMER ? SHIM[s] : ROOM[s];
     }
 }
 
