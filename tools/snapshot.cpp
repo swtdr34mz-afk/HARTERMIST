@@ -44,6 +44,44 @@ int main(int argc, char **argv)
         for (auto *k : c->getChildren())
             if (auto *lv = dynamic_cast<HartermistPanel::Live *>(k))
                 lv->poll();
+    /* every control right-clicked and right-dragged: nothing may change (the host's menu, never the value) */
+    {
+        std::vector<float> before;
+        for (auto *p : proc.getParameters())
+            before.push_back(p->getValue());
+        auto src = juce::Desktop::getInstance().getMainMouseSource();
+        juce::ModifierKeys right(juce::ModifierKeys::rightButtonModifier);
+        int n = 0;
+        for (auto *c : ed->getChildren())
+            for (auto *k : c->getChildren()) {
+                auto pos = k->getLocalBounds().getCentre().toFloat();
+                auto t = juce::Time::getCurrentTime();
+                juce::MouseEvent down(src, pos, right, 1.0f, 0, 0, 0, 0, k, k, t, pos, t, 1, false);
+                juce::MouseEvent drag(src, pos.translated(0, -60), right, 1.0f, 0, 0, 0, 0, k, k, t, pos, t, 1, true);
+                k->mouseDown(down);
+                k->mouseDrag(drag);
+                k->mouseUp(drag);
+                n++;
+            }
+        int changed = 0;
+        auto ps = proc.getParameters();
+        for (int i = 0; i < ps.size(); i++)
+            if (ps[i]->getValue() != before[(size_t)i]) {
+                changed++;
+                std::printf("right click changed %s\n", ps[i]->getName(40).toRawUTF8());
+            }
+        std::printf("right-click test: %d controls, %d parameters changed\n", n, changed);
+        /* and a left drag still moves a knob */
+        auto *k0 = ed->getChildren()[0]->getChildren()[0];
+        float v0 = proc.param(hm::P_L1_FADE)->getValue();
+        auto pos = k0->getLocalBounds().getCentre().toFloat();
+        auto t = juce::Time::getCurrentTime();
+        juce::ModifierKeys left(juce::ModifierKeys::leftButtonModifier);
+        k0->mouseDown(juce::MouseEvent(src, pos, left, 1.0f, 0, 0, 0, 0, k0, k0, t, pos, t, 1, false));
+        k0->mouseDrag(juce::MouseEvent(src, pos.translated(0, -60), left, 1.0f, 0, 0, 0, 0, k0, k0, t, pos, t, 1, true));
+        k0->mouseUp(juce::MouseEvent(src, pos.translated(0, -60), left, 1.0f, 0, 0, 0, 0, k0, k0, t, pos, t, 1, true));
+        std::printf("left drag: FADE IN %.3f -> %.3f\n", v0, proc.param(hm::P_L1_FADE)->getValue());
+    }
     auto img = ed->createComponentSnapshot(ed->getLocalBounds(), true, scale);
     juce::File f = juce::File::getCurrentWorkingDirectory().getChildFile(out);
     f.deleteFile();

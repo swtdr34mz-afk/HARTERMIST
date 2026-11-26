@@ -828,7 +828,7 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
     src[MS_MW] = ctl[1];
     src[MS_AT] = maxf(ctl[2], v.at);
     src[MS_KEY] = clampf(((float)v.note - 60.0f) / 60.0f, -1.0f, 1.0f);
-    src[MS_CC74] = mpe ? v.cc74 : cc74G;
+    src[MS_CC74] = 2.0f * ((mpe ? v.cc74 : cc74G) - 0.5f);   /* (centred: 64 moves nothing) */
     for (int i = 0; i < nvR; i++) {
         const Route &r = vRoutes[i];
         eff[r.dst] += r.amt * src[r.src];
@@ -1199,7 +1199,7 @@ void Engine::chunk()
                 at = maxf(at, v.at);
         src[MS_AT] = at;
         src[MS_KEY] = clampf((lastKey - 60.0f) / 60.0f, -1.0f, 1.0f);
-        src[MS_CC74] = mpe ? lv.cc74 : cc74G;
+        src[MS_CC74] = 2.0f * ((mpe ? lv.cc74 : cc74G) - 0.5f);
         for (int i = 0; i < ngR; i++)
             geff[gRoutes[i].dst] += gRoutes[i].amt * src[gRoutes[i].src];
         for (int p = 0; p < NPARAM; p++)
