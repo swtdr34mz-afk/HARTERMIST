@@ -46,7 +46,7 @@ void drawTechnoLeft(juce::Graphics &, const juce::String &text, juce::Point<floa
                     float spacing = 0.32f);
 
 void drawPanel(juce::Graphics &, juce::Rectangle<float> r, float sc);
-void drawScrew(juce::Graphics &, juce::Point<float> c, float r);
+void drawScrew(juce::Graphics &, juce::Point<float> c, float r, float angle = 0.0f);
 /* a label turned inside out: a white plate, the letters cut out of it */
 void drawInvLabel(juce::Graphics &, juce::Rectangle<float> r, const juce::String &text, float h);
 

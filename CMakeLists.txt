@@ -65,6 +65,7 @@ set(HARTERMIST_SOURCES
     src/PluginProcessor.cpp
     src/PluginEditor.cpp
     src/ui/Look.cpp
+    src/ui/Render.cpp
     dsp/Engine.cpp
     dsp/Fx.cpp
     dsp/Params.cpp

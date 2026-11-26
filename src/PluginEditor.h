@@ -55,7 +55,8 @@ public:
 private:
     void timerCallback() override;
     void build();
-    void paintBackground(juce::Graphics &, float sc);
+    void paintPrint(juce::Graphics &);           /* the silk-screen: lines, legends, rungs, the plates */
+    std::vector<juce::Point<float>> hot;        /* where hands go: the wear */
 
     hmui::Look look;
     std::vector<std::unique_ptr<juce::Component>> parts;

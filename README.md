@@ -3,7 +3,7 @@
 A 6-voice polysynth in the manner of the Dreadbox **Artemis**, as a **VST3** for Windows and the Mac, an **AU** for the
 Mac and a **standalone app**. By **swtdr34mz**.
 
-![HARTERMIST](docs/panel.png)
+![HARTERMIST](docs/panel.jpg)
 
 Unofficial: not made, endorsed or supported by Dreadbox. Its own programs, no Artemis presets in it.
 

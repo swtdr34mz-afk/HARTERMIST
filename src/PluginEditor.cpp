@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (HARTERMIST) */
 #include "PluginEditor.h"
+#include "ui/Render.h"
 
 using namespace hmui;
 using namespace hm;
@@ -119,21 +120,27 @@ struct Mover {
 class Knob : public juce::Component, public Panel::Live
 {
 public:
-    Knob(Panel &p, std::function<int()> which, int kind) : mv{p, std::move(which)}, kind(kind) {}
+    Knob(Panel &p, std::function<int()> which, int kind, float d, uint32_t seed)
+        : mv{p, std::move(which)}, kind(kind), d(d), seed(seed), angleOff(jitter(seed, 3) * 0.035f),
+          paint_(0.82f + 0.14f * (0.5f + 0.5f * jitter(seed, 4)))
+    {
+    }
+    bool hitTest(int x, int y) override
+    {
+        auto c = getLocalBounds().toFloat().getCentre();
+        return c.getDistanceFrom({(float)x, (float)y}) <= d * 0.5f + 3.0f;
+    }
     void paint(juce::Graphics &g) override
     {
         float sc = g.getInternalContext().getPhysicalPixelScaleFactor();
-        auto r = getLocalBounds().toFloat().reduced(12.0f);
         auto full = getLocalBounds().toFloat();
-        if (body.isNull() || sc != bodyScale) {
+        if (body.isNull() || std::fabs(sc - bodyScale) > 0.01f) {
             bodyScale = sc;
-            body = juce::Image(juce::Image::ARGB, juce::jmax(1, (int)std::ceil(full.getWidth() * sc)), juce::jmax(1, (int)std::ceil(full.getHeight() * sc)), true);
-            juce::Graphics bg(body);
-            bg.addTransform(juce::AffineTransform::scale(sc));
-            drawKnobBody(bg, r, kind);
+            body = renderKnob(d, kind, seed, sc);
         }
         g.drawImage(body, full, juce::RectanglePlacement::stretchToFit);
-        drawKnobPointer(g, r, kind == 2 ? turns : shown, kind);
+        auto r = juce::Rectangle<float>(d, d).withCentre(full.getCentre());
+        pointer(g, r, kind == 2 ? turns : shown);
         if (shownAmt != 0.0f)
             drawModArc(g, r, shown, shownAmt);
     }
@@ -208,8 +215,34 @@ private:
         if (onTurn)
             onTurn(d);
     }
+    /* the white line painted on the skirt (each a little its own: its print, its angle on the shaft); the
+     * encoder: a small dimple in its cap, turning */
+    void pointer(juce::Graphics &g, juce::Rectangle<float> r, float pos)
+    {
+        using namespace juce;
+        const Point<float> c = r.getCentre();
+        const float R = d * 0.5f;
+        if (kind == 2) {
+            float a = pos * MathConstants<float>::twoPi;
+            auto p = c.getPointOnCircumference(R * 0.56f, a);
+            g.setColour(Colours::black.withAlpha(0.45f));
+            g.fillEllipse(Rectangle<float>(R * 0.11f, R * 0.11f).withCentre(p));
+            g.setColour(Colours::white.withAlpha(0.35f));
+            g.drawEllipse(Rectangle<float>(R * 0.11f, R * 0.11f).withCentre(p.translated(0.4f, 0.5f)), 0.5f);
+            return;
+        }
+        float a = -2.42f + pos * 4.84f + angleOff;
+        auto p0 = c.getPointOnCircumference(R * 0.71f, a), p1 = c.getPointOnCircumference(R * 0.965f, a);
+        g.setColour(Colours::black.withAlpha(0.5f));
+        g.drawLine(juce::Line<float>(p0, p1).withShortenedStart(-0.3f), jmax(1.8f, d * 0.058f));
+        g.setColour(Colour::fromFloatRGBA(0.95f, 0.95f, 0.93f, paint_));
+        g.drawLine(juce::Line<float>(p0, p1), jmax(1.4f, d * 0.045f));
+    }
     Mover mv;
     int kind;
+    float d;
+    uint32_t seed;
+    float angleOff, paint_;
     float shown = -1.0f, shownAmt = 0.0f, startY = 0.0f, acc = 0.0f, turns = 0.6f, bodyScale = 0.0f;
     juce::Image body;
 };
@@ -218,10 +251,14 @@ private:
 class Fader : public juce::Component, public Panel::Live
 {
 public:
-    Fader(Panel &p, std::function<int()> which) : mv{p, std::move(which)} {}
+    Fader(Panel &p, std::function<int()> which, uint32_t seed) : mv{p, std::move(which)}, seed(seed), jx(jitter(seed, 5) * 0.6f) {}
+    bool hitTest(int x, int y) override
+    {
+        return std::fabs((float)x - (float)getWidth() * 0.5f) <= 22.0f && (float)y >= FT - 30.0f - top0 && (float)y <= FB + 30.0f - top0;
+    }
     void paint(juce::Graphics &g) override
     {
-        float cx = (float)getWidth() * 0.5f;
+        float cx = (float)getWidth() * 0.5f + jx;
         float y = capY(shown);
         if (shownAmt != 0.0f) {                  /* the matrix's amount: a blue bar beside the slot */
             float y1 = capY(juce::jlimit(0.0f, 1.0f, shown + shownAmt));
@@ -231,7 +268,13 @@ public:
             g.setColour(col::modArc);
             g.fillRect(bar);
         }
-        drawFaderCap(g, {cx, y}, CAP);
+        float sc = g.getInternalContext().getPhysicalPixelScaleFactor();
+        if (cap.isNull() || std::fabs(sc - capScale) > 0.01f) {
+            capScale = sc;
+            cap = renderFaderCap(CAP, seed, sc);
+        }
+        float full = (float)cap.getWidth() / sc;
+        g.drawImage(cap, juce::Rectangle<float>(full, full).withCentre({cx, y}), juce::RectanglePlacement::stretchToFit);
     }
     void poll() override
     {
@@ -260,6 +303,10 @@ public:
 private:
     float capY(float v) const { return (FB - (FB - FT) * v) - (float)getY() * 0.0f - top0; }
     Mover mv;
+    uint32_t seed;
+    float jx;
+    juce::Image cap;
+    float capScale = 0.0f;
     float shown = -1.0f, shownAmt = 0.0f, startY = 0.0f;
 
 public:
@@ -270,14 +317,31 @@ public:
 class Btn : public juce::Component, public Panel::Live
 {
 public:
-    Btn(std::function<void()> press, std::function<float()> lit) : onPress(std::move(press)), isLit(std::move(lit)) {}
+    Btn(std::function<void()> press, std::function<float()> lit, uint32_t seed = 1) : onPress(std::move(press)), isLit(std::move(lit)), seed(seed) {}
+    bool hitTest(int x, int y) override { return getLocalBounds().toFloat().getCentre().getDistanceFrom({(float)x, (float)y}) <= 19.0f; }
     std::function<void(const juce::MouseEvent &)> onRight;
     std::function<void()> onLong;
     void setPress(std::function<void()> f) { onPress = std::move(f); }
     void paint(juce::Graphics &g) override
     {
-        auto c = getLocalBounds().toFloat().getCentre();
-        drawButton(g, c, 30.0f, shown, down);
+        auto c = getLocalBounds().toFloat().getCentre().translated(0.0f, down ? 0.7f : 0.0f);
+        float sc = g.getInternalContext().getPhysicalPixelScaleFactor();
+        if (off.isNull() || std::fabs(sc - imgScale) > 0.01f) {
+            imgScale = sc;
+            off = renderButton(30.0f, seed, sc, false);
+            on = renderButton(30.0f, seed, sc, true);
+        }
+        auto place = [&](const juce::Image &im) {
+            float s = (float)im.getWidth() / sc;
+            return juce::Rectangle<float>(s, s).withCentre(c);
+        };
+        if (shown < 0.999f)
+            g.drawImage(off, place(off), juce::RectanglePlacement::stretchToFit);
+        if (shown > 0.001f) {
+            g.setOpacity(shown);
+            g.drawImage(on, place(on), juce::RectanglePlacement::stretchToFit);
+            g.setOpacity(1.0f);
+        }
     }
     void poll() override
     {
@@ -316,6 +380,9 @@ public:
 private:
     std::function<void()> onPress;
     std::function<float()> isLit;
+    uint32_t seed;
+    juce::Image off, on;
+    float imgScale = 0.0f;
     float shown = -1.0f;
     bool down = false, longDone = false;
     double downAt = 0.0;
@@ -364,6 +431,12 @@ public:
             g.setFont(font(Face::mono, h));
             g.drawText(s, a, j, true);
         };
+        struct Glass {
+            Oled &o;
+            Graphics &g;
+            Rectangle<float> r;
+            ~Glass() { o.glass(g, r); }
+        } glassOver{*this, g, glass};
         if (kind == "COLS") {
             /* an effect page / the arp / the sequencer: its title, then five columns over the sliders */
             auto top = in.removeFromTop(17.0f);
@@ -407,10 +480,32 @@ public:
         }
     }
 
+    /* the screen's glass over it: its pixels' grid, a reflection, a smudge */
+    void glass(juce::Graphics &g, juce::Rectangle<float> r)
+    {
+        using namespace juce;
+        g.setColour(Colours::black.withAlpha(0.10f));
+        for (float y = r.getY(); y < r.getBottom(); y += 1.0f)
+            g.fillRect(r.getX(), y, r.getWidth(), 0.22f);
+        g.setGradientFill(ColourGradient(Colours::white.withAlpha(0.07f), r.getX(), r.getY(), Colours::transparentWhite, r.getX() + r.getWidth() * 0.45f,
+                                         r.getBottom(), false));
+        g.fillRect(r);
+        float sc = g.getInternalContext().getPhysicalPixelScaleFactor();
+        if (smudge.isNull() || std::fabs(sc - smScale) > 0.01f) {
+            smScale = sc;
+            smudge = hmui::renderSmudge(r.getWidth(), r.getHeight(), sc, 0x0E1Du);
+        }
+        g.drawImage(smudge, r, RectanglePlacement::stretchToFit);
+        g.setColour(Colours::white.withAlpha(0.12f));
+        g.drawRect(r, 0.8f);
+    }
+
 private:
     juce::StringArray compose() const;
     Panel &panel;
     juce::StringArray lines;
+    juce::Image smudge;
+    float smScale = 0.0f;
 };
 
 juce::StringArray Oled::compose() const
@@ -830,19 +925,29 @@ void Panel::build()
 {
     using juce::Rectangle;
     auto P = [](int p) { return [p] { return p; }; };
+    /* (each part its own seed: its tolerances, its dust; placed a hair off where it should be, as parts are) */
+    uint32_t seed = 0x51u;
     auto knob = [&](float x, float y, std::function<int()> which, float d, int kind = 0) {
-        auto *k = add<Knob>(*this, std::move(which), kind);
-        k->setBounds(Rectangle<float>(d + 24.0f, d + 24.0f).withCentre({x, y}).toNearestInt());
+        seed += 7919u;
+        auto *k = add<Knob>(*this, std::move(which), kind, d, seed);
+        float m = shadowMargin(d), f = d + 2.0f * m;
+        k->setBounds(Rectangle<float>(f, f).withCentre({x + jitter(seed, 1) * 0.7f, y + jitter(seed, 2) * 0.7f}).toNearestInt());
+        hot.push_back({x, y});
         return k;
     };
     auto fader = [&](float x, std::function<int()> which) {
-        auto *f = add<Fader>(*this, std::move(which));
-        f->setBounds(Rectangle<float>(x - 26.0f, FT - 26.0f, 52.0f, FB - FT + 52.0f).toNearestInt());
-        f->top0 = FT - 26.0f;
+        seed += 7919u;
+        auto *f = add<Fader>(*this, std::move(which), seed);
+        f->setBounds(Rectangle<float>(x - 45.0f, FT - 50.0f, 90.0f, FB - FT + 100.0f).toNearestInt());
+        f->top0 = FT - 50.0f;
+        hot.push_back({x, FB - 30.0f});
+        hot.push_back({x, (FT + FB) * 0.5f});
     };
     auto button = [&](float x, float y, std::function<void()> press, std::function<float()> lit) {
-        auto *b = add<Btn>(std::move(press), std::move(lit));
-        b->setBounds(Rectangle<float>(44.0f, 44.0f).withCentre({x, y}).toNearestInt());
+        seed += 7919u;
+        auto *b = add<Btn>(std::move(press), std::move(lit), seed);
+        b->setBounds(Rectangle<float>(100.0f, 100.0f).withCentre({x + jitter(seed, 1) * 0.5f, y + jitter(seed, 2) * 0.5f}).toNearestInt());
+        hot.push_back({x, y});
         return b;
     };
     auto cycle = [this](int p) {
@@ -993,10 +1098,9 @@ void Panel::build()
 }
 
 /* ---------------------------------------------------------------------------- the background --- */
-void Panel::paintBackground(juce::Graphics &g, float sc)
+void Panel::paintPrint(juce::Graphics &g)
 {
     using namespace juce;
-    drawPanel(g, {0.0f, 0.0f, (float)W, (float)H}, sc);
     const float LW = 2.4f, RR = 14.0f;
     g.setColour(col::legend);
     /* the sections' lines: a left side, the top, a right side, rounded where they meet */
@@ -1128,8 +1232,14 @@ void Panel::paintBackground(juce::Graphics &g, float sc)
             wave(1, c.getPointOnCircumference(rr, 0.0f).translated(ring ? 0.0f : 12.0f, 0.0f), 7.0f);
             wave(2, c.getPointOnCircumference(rr, 2.05f), 7.0f);
         }
-        L("VCO1", 474, 212, 9.5f);
-        L("VCO2", 486, 236, 9.5f);
+        /* VCO1, VCO2 along their rings */
+        for (int ring = 0; ring < 2; ring++) {
+            const String t = ring ? "VCO2" : "VCO1";
+            float rr = ring ? 76.0f : 100.0f, a = ring ? -0.62f : -0.5f;
+            Path p = technoPath(t, 8.5f);
+            p.applyTransform(AffineTransform::translation(-technoWidth(t, 8.5f) * 0.5f, -4.25f).rotated(a).translated(c.getPointOnCircumference(rr, a)));
+            g.strokePath(p, PathStrokeType(1.4f, PathStrokeType::curved, PathStrokeType::rounded));
+        }
         L("WAVE", 535, 404);
     }
     drawInvLabel(g, {358.0f, 447.0f, 66.0f, 22.0f}, "SYNC", LH);
@@ -1210,29 +1320,69 @@ void Panel::paintBackground(juce::Graphics &g, float sc)
     /* the sliders' slots and the rungs between the pairs */
     {
         const float xs[] = {67, 133, 205, 280, 385, 458, 530, 603, 677, 783, 857, 930, 1002, 1103, 1180, 1255, 1328, 1435, 1508, 1580, 1655, 1727};
-        for (float x : xs)
-            drawSlot(g, x, FT, FB);
+        (void)xs;
         const float pairs[][2] = {{67, 133}, {205, 280}, {385, 458}, {530, 603}, {603, 677}, {783, 857}, {930, 1002},
                                   {1103, 1180}, {1180, 1255}, {1255, 1328}, {1435, 1508}, {1508, 1580}, {1580, 1655}, {1655, 1727}};
         for (auto &pr : pairs)
             drawRungs(g, pr[0] + 11.0f, pr[1] - 11.0f, FT - 2.0f, FB + 2.0f, 9);
     }
-    for (auto c : {Point<float>(18, 28), Point<float>(888, 28), Point<float>(1765, 28), Point<float>(18, 872), Point<float>(888, 872),
-                   Point<float>(1765, 872)})
-        drawScrew(g, c, 6.0f);
 }
 
 void Panel::paint(juce::Graphics &g)
 {
+    using namespace juce;
     float sc = g.getInternalContext().getPhysicalPixelScaleFactor();
-    if (sc != backgroundScale || background.isNull()) {
+    if (std::fabs(sc - backgroundScale) > 0.01f || background.isNull()) {
         backgroundScale = sc;
-        background = juce::Image(juce::Image::RGB, juce::jmax(1, (int)std::ceil(W * sc)), juce::jmax(1, (int)std::ceil(H * sc)), true);
-        juce::Graphics bg(background);
-        bg.addTransform(juce::AffineTransform::scale(sc));
-        paintBackground(bg, sc);
+        const auto T = AffineTransform::scale(sc);
+        const Rectangle<float> all(0.0f, 0.0f, (float)W, (float)H);
+        /* the anodised face, its slots cut in it */
+        background = renderPanelFace((float)W, (float)H, sc, hot);
+        {
+            Graphics bg(background);
+            bg.addTransform(T);
+            const float xs[] = {67, 133, 205, 280, 385, 458, 530, 603, 677, 783, 857, 930, 1002, 1103, 1180, 1255, 1328, 1435, 1508, 1580, 1655, 1727};
+            for (float x : xs)
+                drawSlotReal(bg, x, FT, FB);
+        }
+        /* the print, worn where hands go */
+        Image layer(Image::ARGB, background.getWidth(), background.getHeight(), true);
+        {
+            Graphics lg(layer);
+            lg.addTransform(T);
+            paintPrint(lg);
+        }
+        wearPrint(layer, sc, hot, 0xA17E5u);
+        {
+            Graphics bg(background);
+            bg.drawImageAt(layer, 0, 0);
+            bg.addTransform(T);
+            /* its screws, each turned its own way */
+            int k = 0;
+            for (auto c : {Point<float>(18, 28), Point<float>(888, 28), Point<float>(1765, 28), Point<float>(18, 872), Point<float>(888, 872),
+                           Point<float>(1765, 872)}) {
+                float a = jitter(0x5C3u, k++) * 1.5f;
+                drawScrew(bg, c, 6.0f, a);
+            }
+            drawScratches(bg, all.reduced(20.0f), 70, 0x5C7A7u);
+        }
+        /* finger grease: near what is played most, and a few anywhere */
+        {
+            std::vector<Point<float>> fp;
+            for (size_t i = 0; i < hot.size(); i += 5)
+                fp.push_back(hot[i] + Point<float>(jitter(0xF1u, (int)i) * 40.0f, 30.0f + jitter(0xF2u, (int)i) * 30.0f));
+            fp.push_back({1240.0f, 600.0f});
+            fp.push_back({300.0f, 240.0f});
+            fp.push_back({1550.0f, 560.0f});
+            addFingerprints(background, sc, fp, 0xF1A6u);
+        }
+        {
+            Graphics bg(background);
+            bg.addTransform(T);
+            drawDust(bg, all.reduced(12.0f), 420, 0xD057u, sc);
+        }
     }
-    g.drawImage(background, getLocalBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
+    g.drawImage(background, getLocalBounds().toFloat(), RectanglePlacement::stretchToFit);
 }
 
 void Panel::timerCallback()

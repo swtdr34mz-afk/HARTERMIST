@@ -224,16 +224,25 @@ void drawPanel(juce::Graphics &g, juce::Rectangle<float> r, float sc)
     g.drawRoundedRectangle(face.expanded(1.5f), 11.0f, 2.0f);
 }
 
-void drawScrew(juce::Graphics &g, juce::Point<float> c, float r)
+void drawScrew(juce::Graphics &g, juce::Point<float> c, float r, float angle)
 {
     using namespace juce;
-    g.setGradientFill(ColourGradient(Colour(0xff3a3a3d), c.x - r, c.y - r, Colour(0xff0a0a0b), c.x + r, c.y + r, false));
+    g.setColour(Colours::black.withAlpha(0.6f));
+    g.fillEllipse(Rectangle<float>(2.4f * r, 2.4f * r).withCentre(c.translated(0.5f, 0.9f)));
+    /* a black pan head: domed, its light from the upper left */
+    g.setGradientFill(ColourGradient(Colour(0xff4a4a4e), c.x - r * 0.5f, c.y - r * 0.6f, Colour(0xff060607), c.x + r * 0.7f, c.y + r * 0.8f, true));
     g.fillEllipse(Rectangle<float>(2 * r, 2 * r).withCentre(c));
+    g.setColour(Colours::white.withAlpha(0.25f));
+    g.fillEllipse(Rectangle<float>(r * 0.7f, r * 0.45f).withCentre(c.translated(-r * 0.35f, -r * 0.45f)));
+    for (float a : {angle, angle + 1.5708f}) {
+        auto p0 = c.getPointOnCircumference(r * 0.62f, a), p1 = c.getPointOnCircumference(r * 0.62f, a + MathConstants<float>::pi);
+        g.setColour(Colours::white.withAlpha(0.18f));
+        g.drawLine(Line<float>(p0, p1).withShortenedStart(0.0f), r * 0.3f);
+        g.setColour(Colour(0xff020202));
+        g.drawLine(Line<float>(p0.translated(-0.3f, -0.3f), p1.translated(-0.3f, -0.3f)), r * 0.26f);
+    }
     g.setColour(Colours::black);
-    g.drawEllipse(Rectangle<float>(2 * r, 2 * r).withCentre(c), 0.8f);
-    g.setColour(Colour(0xff050505));
-    g.drawLine(c.x - r * 0.6f, c.y, c.x + r * 0.6f, c.y, r * 0.28f);
-    g.drawLine(c.x, c.y - r * 0.6f, c.x, c.y + r * 0.6f, r * 0.28f);
+    g.drawEllipse(Rectangle<float>(2 * r, 2 * r).withCentre(c), 0.7f);
 }
 
 void drawInvLabel(juce::Graphics &g, juce::Rectangle<float> r, const juce::String &text, float h)
