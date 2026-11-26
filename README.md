@@ -50,8 +50,8 @@ xattr -cr ~/Library/Audio/Plug-Ins/VST3/HARTERMIST.vst3 ~/Library/Audio/Plug-Ins
 
 ## What it has
 
-- **6 voices**; PLAY MODE **POLY**, **TRI** (3 notes of 2 voices), **DUO** (2 of 3), **UNISON** (6 on one note),
-  **MONO**; the stacked voices detuned by **DTN**; LEGATO, GLIDE on / AUTO (polyphonic glide).
+- **6 voices** as the Artemis, or **8** (MENU → Global); PLAY MODE **POLY**, **TRI** (pairs: 3 or 4 notes), **DUO** (2 notes
+  of 3 or 4 voices), **UNISON** (all on one note), **MONO**; the stacked voices detuned by **DTN**; LEGATO, GLIDE on / AUTO (polyphonic glide).
 - Per voice: **two VCOs**, one **WAVE** morphing both from sawtooth through square to triangle, **PW** narrowing both (to
   silence, as the Artemis' PW does), **VCO 2** ±2 octaves in semitones, **DTN** raising it, hard **SYNC** of VCO 2 to
   VCO 1, **through-zero linear FM** of VCO 1 by VCO 2 (or its depth from the filter envelope: **ENV**), **SUB / NOISE**
@@ -84,6 +84,11 @@ xattr -cr ~/Library/Audio/Plug-Ins/VST3/HARTERMIST.vst3 ~/Library/Audio/Plug-Ins
 - The **poly sequencer**: 64 steps of up to six notes, ties and rests, recorded step by step; STEPS, DIV, PROB, SWNG,
   GATE; its place follows the song's (it stays in step when the program changes).
 - **MPE** (MENU → Global): each note its own pitch bend (up to 96 semitones), pressure and CC74. Poly aftertouch.
+- **The analog circuit's ways**: each voice its own parts (the VCOs' expo converters tracking a hair apart, the
+  comparators' thresholds, the filter's four capacitors and its input pair's offset), the VCO cores' ramps a little
+  bowed, their output buffers rounding the top end, the coupling capacitors letting the square's top sag; the
+  low-pass' resonance through its own OTA (creamy, bass partly made up), the 12 dB mode quieter, the two VCOs mixed no
+  louder than one, the sub modest, the OTA VCA's curve; a breath of pitch jitter, INSTABILITY mostly in the tuning.
 - The voices at 4x the rate (HIGH) or 2x (ECO).
 - 38 programs of its own in bank A; your own after them (SAVE).
 

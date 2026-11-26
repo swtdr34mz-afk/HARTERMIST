@@ -24,6 +24,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout HartermistProcessor::createL
         juce::AudioParameterFloatAttributes().withStringFromValueFunction([](float v, int) {
             return v <= 0.0001f ? juce::String("-inf") : juce::String(20.0f * std::log10(v * v * 2.0f), 1) + " dB";
         })));
+    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{"voices", 1}, "Voices",
+                                                            juce::StringArray{"6 Voices", "8 Voices"}, 0));
     layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"mpe", 1}, "MPE", false));
     layout.add(std::make_unique<juce::AudioParameterInt>(juce::ParameterID{"mpe_pb", 1}, "MPE Pitch Wheel", 0, 96, 48));
     layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"host_sync", 1}, "Host Sync", true));
@@ -351,6 +353,7 @@ void HartermistProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::M
         sentMpePb = mpb;
     }
     engine.setQuality(apvts.getRawParameterValue("quality")->load() > 0.5f ? 1 : 0);
+    engine.setVoices(apvts.getRawParameterValue("voices")->load() > 0.5f ? 8 : 6);
 
     {
         int s1, n1, s2, n2;

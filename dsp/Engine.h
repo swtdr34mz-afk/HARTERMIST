@@ -32,7 +32,7 @@
 
 namespace hm
 {
-constexpr int NV = 6, CH = 16, NKEYS = 32, MAXOS = 4;
+constexpr int NV = 8, CH = 16, NKEYS = 32, MAXOS = 4;   /* (6 voices, as the Artemis, or 8) */
 
 class Engine
 {
@@ -44,6 +44,8 @@ public:
     void setParam(int p, int v);
     void setMod(int src, int dst, int amt);
     void setQuality(int q) { quality = q ? 1 : 0; }
+    void setVoices(int n);                       /* 6 or 8 */
+    int voiceCount() const { return nVoices; }
     void setMpe(bool on, int pbRange) { mpe = on; mpePb = (float)pbRange; }
 
     /* MIDI (channels 1..16) */
@@ -95,7 +97,9 @@ private:
         bool l1done = false, l2done = false;
         float f[4] = {}, ffb = 0.0f;             /* the filter's stages (12 dB: the first two) */
         float at = 0.0f, bend = 0.0f, cc74 = 0.5f;
-        float vr[6] = {};                        /* INSTABILITY: this voice's own differences (-1..1) */
+        float vr[16] = {};                       /* this voice's own parts: their tolerances (-1..1) */
+        float ac1 = 0, ac2 = 0, acx1 = 0, acx2 = 0;   /* the VCOs' coupling capacitors (the square's tilt) */
+        float lp1 = 0, lp2 = 0, pn = 0, ve = 0;   /* their output buffers, the pitch's jitter, the VCA's state */
         float dr = 0.0f, dt = 0.0f;
         int drn = 0;
         uint32_t seed = 1, age = 0;
@@ -113,7 +117,7 @@ private:
     Program prog;
     Voice V[NV];
     FxChain fx;
-    int quality = 1;
+    int quality = 1, nVoices = 6;
     float sr = 44100.0f;
     bool mpe = false;
     float mpePb = 48.0f;

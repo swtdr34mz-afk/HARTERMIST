@@ -12,7 +12,8 @@ constexpr float VOICE_GAIN = 0.62f;
 /* each voice of a stack: its place in the detune (-1..1) */
 const float DET2[2] = {-1.0f, 1.0f};
 const float DET3[3] = {-1.0f, 0.0f, 1.0f};
-const float DET6[6] = {-1.0f, 1.0f, -0.6f, 0.6f, -0.2f, 0.2f};
+const float DET4[4] = {-1.0f, 1.0f, -0.33f, 0.33f};
+const float DET8[8] = {-1.0f, 1.0f, -0.6f, 0.6f, -0.2f, 0.2f, -0.4f, 0.4f};
 
 inline float attSec(float x) { return 0.0005f * std::exp2(x * 14.29f); }   /* 0.5 ms .. 10 s */
 inline float decSec(float x) { return 0.0012f * std::exp2(x * 14.0f); }    /* 1.2 ms .. 20 s */
@@ -130,6 +131,22 @@ void Engine::setParam(int p, int v)
     }
 }
 
+void Engine::setVoices(int n)
+{
+    n = n >= 8 ? 8 : 6;
+    if (n == nVoices)
+        return;
+    nVoices = n;
+    allOff();
+    for (int i = n; i < NV; i++) {
+        V[i].on = false;
+        V[i].pend = false;
+        V[i].fst = V[i].ast = ES_IDLE;
+        V[i].fe = V[i].ae = 0.0f;
+        V[i].key = -1;
+    }
+}
+
 void Engine::setMod(int src, int dst, int amt)
 {
     if (src < 0 || src >= NMODSRC || dst < 0 || dst >= NPARAM)
@@ -205,10 +222,11 @@ void Engine::cc74(int ch, float v)
 /* ------------------------------------------------------------------- notes --- */
 int Engine::stackSize() const
 {
+    /* TRI: pairs; DUO: two halves; UNISON: all of them (with 6 voices as the Artemis: 3 x 2, 2 x 3, 6) */
     switch (prog.p[P_PLAY_MODE]) {
     case PM_TRI: return 2;
-    case PM_DUO: return 3;
-    case PM_UNISON: return 6;
+    case PM_DUO: return nVoices / 2;
+    case PM_UNISON: return nVoices;
     default: return 1;
     }
 }
@@ -296,7 +314,7 @@ void Engine::playNote(int k, int ch, int note, float vel, bool legato)
         for (int j = 0; j < st; j++) {
             Voice &v = V[j];
             bool keep = legato && v.on && v.gate;
-            startVoice(v, k, ch, note, vel, st > 1 ? DET6[j] : 0.0f, !keep);
+            startVoice(v, k, ch, note, vel, st > 1 ? DET8[j] : 0.0f, !keep);
         }
         return;
     }
@@ -304,7 +322,7 @@ void Engine::playNote(int k, int ch, int note, float vel, bool legato)
     if (slot < 0)
         return;
     for (int j = 0; j < st; j++)
-        startVoice(V[slot * st + j], k, ch, note, vel, st == 2 ? DET2[j] : st == 3 ? DET3[j] : 0.0f, true);
+        startVoice(V[slot * st + j], k, ch, note, vel, st == 2 ? DET2[j] : st == 3 ? DET3[j] : st == 4 ? DET4[j] : 0.0f, true);
 }
 
 void Engine::stopNote(int k)
@@ -327,7 +345,7 @@ void Engine::stopNote(int k)
 int Engine::findSlot()
 {
     /* a free one (the longest silent), else the oldest let go, else the oldest */
-    const int st = stackSize(), n = NV / st;
+    const int st = stackSize(), n = nVoices / st;
     int best = -1;
     uint32_t bestAge = 0xFFFFFFFFu;
     for (int pass = 0; pass < 3 && best < 0; pass++) {
@@ -462,7 +480,7 @@ void Engine::monoUpdate(bool newKey)
     bool retrig = !(P[P_LEGATO] && snd);
     anyHeld = snd;
     for (int j = 0; j < st; j++)
-        startVoice(V[j], K_MONO, ch, note, vel, st > 1 ? DET6[j] : 0.0f, retrig);
+        startVoice(V[j], K_MONO, ch, note, vel, st > 1 ? DET8[j] : 0.0f, retrig);
 }
 
 void Engine::sustain(bool on)
@@ -885,24 +903,31 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
     float uni = st > 1 ? v.det * dtn * dtn * 0.5f : 0.0f;
     float l1semi = 24.0f * eff[P_L1_VCO] * eff[P_L1_VCO] * l1;
     int tgt = P[P_L1_TGT];
-    float s1 = v.p + semisOf(P_VCO1_TUNE, eff[P_VCO1_TUNE]) + bendS + uni + v.dr + 0.15f * inst * v.vr[0] +
+    /* INSTABILITY: mostly the tuning (each VCO its own offset, quickly more than a little), the tracking of each
+     * VCO's expo converter a hair off (a little stretch or squeeze over the keyboard: always, as in any analog) */
+    const float wonk = 0.5f * inst * std::sqrt(inst);
+    const float trk1 = 0.0012f * v.vr[6] * (0.4f + inst), trk2 = 0.0012f * v.vr[7] * (0.4f + inst);
+    float s1 = v.p + semisOf(P_VCO1_TUNE, eff[P_VCO1_TUNE]) + bendS + uni + v.dr + wonk * v.vr[0] + trk1 * (v.p - 60.0f) +
                (tgt != LT_VCO2 ? l1semi : 0.0f);
-    float s2 = v.p + semisOf(P_VCO2, eff[P_VCO2]) + dtn * dtn * 1.0f + bendS + uni + v.dr * 0.8f + 0.15f * inst * v.vr[1] +
+    float s2 = v.p + semisOf(P_VCO2, eff[P_VCO2]) + dtn * dtn * 1.0f + bendS + uni + v.dr * 0.8f + wonk * v.vr[1] + trk2 * (v.p - 60.0f) +
                (tgt != LT_VCO1 ? l1semi : 0.0f);
     float morph = clampf(eff[P_WAVE] + l2 * eff[P_L2_WAVE] * 0.75f, 0.0f, 1.0f);
     float pwb = eff[P_PW] + 0.03f * inst * v.vr[2];
-    float duty = 1.0f - 0.996f * clampf(pwb, 0.0f, 1.0f);
-    float duty1 = 1.0f - 0.996f * clampf(pwb + l2 * eff[P_L2_PW] * 0.5f, 0.0f, 1.0f);
+    /* (each comparator's threshold a little its own: the squares never quite square) */
+    float duty = (1.0f - 0.996f * clampf(pwb, 0.0f, 1.0f)) * (1.0f + 0.012f * v.vr[14]);
+    float duty1 = (1.0f - 0.996f * clampf(pwb + l2 * eff[P_L2_PW] * 0.5f, 0.0f, 1.0f)) * (1.0f - 0.012f * v.vr[14]);
     float sn = eff[P_SUBNOISE] * 2.0f - 1.0f;
     float m = eff[P_VCOMIX];
-    float g1 = minf(1.0f, 2.0f * (1.0f - m)), g2 = minf(1.0f, 2.0f * m);
+    /* the crossfader: each alone at full level, both halfway at the middle (two VCOs together sound no louder than
+     * one, as the Artemis' do) */
+    float g1 = 1.0f - m, g2 = m;
     float trk = P[P_TRACK] == TR_FULL ? 1.0f : P[P_TRACK] == TR_HALF ? 0.5f : 0.0f;
     float cut = eff[P_CUT] * 10.0f + trk * (v.p - 60.0f) / 12.0f + 6.0f * eff[P_L1_VCF] * eff[P_L1_VCF] * l1 +
                 0.35f * inst * v.vr[3];
     float ampVel = (float)P[P_AMP_VEL] / 100.0f;
     float amp = (1.0f - ampVel * (1.0f - v.vel)) * VOICE_GAIN / std::sqrt((float)st);
 
-    float tg[15] = {s1, s2, cut, morph, duty, duty1, 0.5f * g1, 0.5f * g2, 0.55f * maxf(0.0f, -sn),
+    float tg[15] = {s1, s2, cut, morph, duty, duty1, 0.55f * g1, 0.55f * g2, 0.30f * maxf(0.0f, -sn),
                     0.45f * maxf(0.0f, sn) * maxf(0.0f, sn), 6.0f * eff[P_FM] * eff[P_FM], 6.0f * eff[P_FFM] * eff[P_FFM],
                     eff[P_RES], 9.0f * eff[P_F_ENV], amp};
     float *sv[15] = {&v.s1, &v.s2, &v.sCut, &v.sMorph, &v.sDuty, &v.sDuty1, &v.sG1, &v.sG2, &v.sSub, &v.sNoise, &v.sFm,
@@ -965,6 +990,11 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
     float pan = (idx & 1 ? 1.0f : -1.0f) * gSpread;
     const float gl = minf(1.0f, 1.0f - pan), gr = minf(1.0f, 1.0f + pan);
 
+    const float bow = 0.05f + 0.025f * v.vr[8], bow2 = 0.05f - 0.025f * v.vr[8];
+    const float kBuf = 1.0f - std::exp(-2.0f * PI * 15500.0f * ifos), kAc = 1.0f - 2.0f * PI * 11.0f * ifos;
+    /* the filter's parts: its four capacitors a little apart, its input pair's offset (even harmonics) */
+    const float gm[4] = {1.0f + 0.016f * v.vr[9], 1.0f + 0.016f * v.vr[10], 1.0f + 0.016f * v.vr[11], 1.0f + 0.016f * v.vr[12]};
+    const float bias = 0.05f + 0.03f * v.vr[13], bias0 = sat(bias);
     Shape sh1, sh2;
     for (int s = 0; s < n; s++) {
         for (int i = 2; i < 15; i++)
@@ -1005,7 +1035,8 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
         sh1.set(cur[3], cur[5]);
         sh2.set(cur[3], cur[4]);
         float idx_ = cur[10] * (fmEnv ? fe : 1.0f);
-        float i1 = inc1 * (1.0f + idx_ * v.o2);
+        v.pn += (rndF(v.seed) - v.pn) * 0.002f;             /* (the pitch never perfectly still: a breath of jitter) */
+        float i1 = inc1 * (1.0f + idx_ * v.o2) * (1.0f + 0.00006f * v.pn);
         float a1 = std::fabs(i1);
         float p1 = v.ph1 + i1;
         bool wrapped = false;
@@ -1023,7 +1054,7 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
             p1 -= std::floor(p1);
         v.ph1 = p1;
         float y1 = sh1.tick(p1, minf(a1, 0.49f));
-        float p2 = v.ph2 + inc2;
+        float p2 = v.ph2 + inc2 * (1.0f - 0.00005f * v.pn);
         if (p2 >= 1.0f)
             p2 -= 1.0f;
         float corr = 0.0f;
@@ -1055,7 +1086,16 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
                 ys -= 2.0f * blepR(t);
         }
         float nz = rndF(v.seed);
-        float x = cur[6] * y1 + cur[7] * y2 + cur[8] * ys + cur[9] * nz;
+        /* each VCO's output as its circuit gives it: the core's ramp a little bowed (the capacitor charging), the
+         * buffer's top end rounded, its coupling capacitor letting the square's top sag (round, Roland-like) */
+        float b1 = y1 + bow * (y1 * y1 - 0.33f), b2 = y2 + bow2 * (y2 * y2 - 0.33f);
+        v.lp1 += (b1 - v.lp1) * kBuf;
+        v.lp2 += (b2 - v.lp2) * kBuf;
+        v.ac1 = v.lp1 - v.acx1 + kAc * v.ac1;
+        v.acx1 = v.lp1;
+        v.ac2 = v.lp2 - v.acx2 + kAc * v.ac2;
+        v.acx2 = v.lp2;
+        float x = cur[6] * v.ac1 + cur[7] * v.ac2 + cur[8] * ys + cur[9] * nz;
         x += 3e-5f * nz;                         /* (the circuit's own hiss) */
 
         /* the cutoff, per sample: the envelope, FFM at audio rate */
@@ -1067,14 +1107,18 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
             /* 24 dB: four OTA stages, each saturating, the resonance from the last (averaged over two samples) */
             float g = 1.0f - fexp2(-wk * hz * 1.4427f * 1.06f);
             float k = minf(res * 1.24f, noOsc ? 0.93f : 1.3f);
+            /* the resonance through its own OTA (it rounds off: creamy, it sings without screaming), a part of the
+             * input given back to it (the bass lost to the resonance partly made up, less lost than most) */
             float fb = 0.5f * (v.f[3] + v.ffb);
             v.ffb = v.f[3];
-            float u = sat(0.6f * x - 4.0f * k * fb);
-            v.f[0] += g * ota(u - v.f[0]);
-            v.f[1] += g * ota(v.f[0] - v.f[1]);
-            v.f[2] += g * ota(v.f[1] - v.f[2]);
-            v.f[3] += g * ota(v.f[2] - v.f[3]);
-            y = v.f[3] * (1.0f + 0.35f * k) * 1.5f;
+            float xin = 0.6f * x;
+            float fbv = softT(1.15f * (fb - 0.22f * xin)) * (1.0f / 1.15f);
+            float u = sat(xin - 4.0f * k * fbv + bias) - bias0;
+            v.f[0] += g * gm[0] * ota(u - v.f[0]);
+            v.f[1] += g * gm[1] * ota(v.f[0] - v.f[1]);
+            v.f[2] += g * gm[2] * ota(v.f[1] - v.f[2]);
+            v.f[3] += g * gm[3] * ota(v.f[2] - v.f[3]);
+            y = v.f[3] * (1.0f + 0.22f * k) * 1.5f;
         } else {
             /* 12 dB: a 2-pole state variable of OTAs, its band saturating */
             float g = tanW(minf(PI * hz * ifos, 1.2f));
@@ -1084,10 +1128,11 @@ void Engine::voiceChunk(Voice &v, int idx, int os)
             float v3 = in - v.f[1], v1 = a1_ * v.f[0] + a2 * v3, v2 = v.f[1] + g * v1;
             v.f[0] = 3.0f * softT((2.0f * v1 - v.f[0]) * (1.0f / 3.0f));
             v.f[1] = 2.0f * v2 - v.f[1];
-            y = v2 * 1.5f / (1.0f + 0.4f * res);
+            y = v2 * 1.1f / (1.0f + 0.4f * res);       /* (quieter than the 24 dB, as the Artemis' is) */
         }
         y *= dcomp;
-        float out = y * ae * cur[14];
+        /* the OTA VCA: its own gentle curve at the top */
+        float out = softT(y * ae * 1.4f) * (1.0f / 1.4f) * cur[14];
         bufL[s] += out * gl;
         bufR[s] += out * gr;
     }

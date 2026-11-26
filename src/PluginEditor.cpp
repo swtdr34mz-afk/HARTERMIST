@@ -623,7 +623,8 @@ juce::StringArray Oled::compose() const
         return s;
     }
     s.add("PRESET");
-    s.add(String(PLAYMODE_NAME[proc.value(P_PLAY_MODE)]).toUpperCase());
+    s.add(String(PLAYMODE_NAME[proc.value(P_PLAY_MODE)]).toUpperCase() +
+          (proc.apvts.getParameter("voices")->getValue() > 0.5f ? " 8V" : " 6V"));
     s.add(proc.programPlace(proc.getCurrentProgram()));
     s.add(proc.programName().toUpperCase());
     String st = proc.value(P_ARP_ON) ? "ARP" : proc.value(P_SEQ_ON) ? "SEQ" : "";
@@ -834,6 +835,10 @@ void Panel::menu(juce::Rectangle<int> screen)
         PopupMenu gl;
         auto glob = [this](const char *id) { return proc.apvts.getParameter(id); };
         bool mpe = glob("mpe")->getValue() > 0.5f;
+        bool eight = glob("voices")->getValue() > 0.5f;
+        gl.addItem(220, "6 voices (as the Artemis)", true, !eight);
+        gl.addItem(221, "8 voices", true, eight);
+        gl.addSeparator();
         gl.addItem(200, "MIDI: Omni", true, !mpe);
         gl.addItem(201, "MIDI: MPE", true, mpe);
         PopupMenu pb;
@@ -879,6 +884,8 @@ void Panel::menu(juce::Rectangle<int> screen)
         case 10: pr.setValue(P_LEGATO, pr.value(P_LEGATO) ? 0 : 1); self->touch(P_LEGATO); break;
         case 11: pr.setValue(P_DLY_SYNC, pr.value(P_DLY_SYNC) ? 0 : 1); self->touch(P_DLY_SYNC); break;
         case 120: pr.clearMods(-1); self->say("Matrix cleared"); break;
+        case 220: setG("voices", 0.0f); self->say("6 voices"); break;
+        case 221: setG("voices", 1.0f); self->say("8 voices"); break;
         case 200: setG("mpe", 0.0f); break;
         case 201: setG("mpe", 1.0f); break;
         case 210: setG("host_sync", pr.apvts.getParameter("host_sync")->getValue() > 0.5f ? 0.0f : 1.0f); break;

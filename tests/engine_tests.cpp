@@ -204,6 +204,26 @@ static void testPlayModes()
     }
 }
 
+static void testEightVoices()
+{
+    /* 8 voices: eight notes at once in POLY; UNISON stacks all eight; TRI four pairs */
+    Program p;
+    programInit(p);
+    for (int m : {PM_POLY, PM_UNISON, PM_TRI, PM_DUO}) {
+        p.p[P_PLAY_MODE] = (int16_t)m;
+        Engine e;
+        e.prepare(48000.0);
+        e.setVoices(8);
+        e.setProgram(p);
+        Out o;
+        for (int k = 0; k < 8; k++)
+            e.noteOn(1, 48 + 3 * k, 0.8f);
+        render(e, o, 12000);
+        CHECK(e.voicesSounding() == 8, "8 voices, %s: %d sounding", PLAYMODE_NAME[m], e.voicesSounding());
+        CHECK(o.finite() && o.peak(0, 12000) < 1.3f, "8 voices, %s: level %.2f", PLAYMODE_NAME[m], o.peak(0, 12000));
+    }
+}
+
 static void testArpSeq()
 {
     {
@@ -326,6 +346,7 @@ int main()
     testTuning();
     testEffects();
     testPlayModes();
+    testEightVoices();
     testArpSeq();
     testMpeAndMatrix();
     testBlocks();
