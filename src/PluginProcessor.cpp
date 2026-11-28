@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (HARTERMIST) */
 #include "PluginProcessor.h"
+#include "PanelDialog.h"
 #include "PluginEditor.h"
 
 using namespace hm;
@@ -177,7 +178,7 @@ void HartermistProcessor::initialize()
 
 juce::File HartermistProcessor::programFolder()
 {
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("HARTERMIST").getChildFile("Programs");
+    return pdlg::docsOrAppData().getChildFile("HARTERMIST").getChildFile("Programs");
 }
 
 void HartermistProcessor::programToXml(const Program &p, juce::XmlElement &x)

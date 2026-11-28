@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (HARTERMIST) */
 #include "PluginEditor.h"
+#include "PanelDialog.h"
+#include "WindowSize.h"
 #include "ui/Render.h"
 
 using namespace hmui;
@@ -969,8 +971,9 @@ void Panel::saveDialog()
     w->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
     juce::Component::SafePointer<Panel> self(this);
     dialog = w;
+    pdlg::showInside(*this, w);
     w->enterModalState(true, juce::ModalCallbackFunction::create([self, w](int r) {
-                           if (self && r == 1 && self->proc.writeProgram(w->getTextEditorContents("name")) >= 0)
+                           if (self && r == 1 && pdlg::checked(self->proc.writeProgram(w->getTextEditorContents("name")), *self) >= 0)
                                self->say("Saved");
                        }),
                        true);
@@ -1460,11 +1463,16 @@ HartermistEditor::HartermistEditor(HartermistProcessor &p) : AudioProcessorEdito
         area = d->userArea;
     double fit = juce::jmin((area.getWidth() - 40) / W, (area.getHeight() - 90) / H);
     fit = juce::jlimit(0.35, 1.6, fit);
+    /* the size it was left at, read before the limits below resize the empty window (that resize would otherwise
+     * overwrite it with the smallest size); a new instance: the size last used anywhere */
+    const double keptScale = (double)proc.uiScale.load();
+    const bool keptSet = proc.uiScaleSet;
     setResizable(true, true);
     setResizeLimits((int)(W * 0.35), (int)(H * 0.35), (int)(W * juce::jmax(0.5, fit)), (int)(H * juce::jmax(0.5, fit)));
     getConstrainer()->setFixedAspectRatio(W / H);
-    double s = proc.uiScaleSet ? (double)proc.uiScale.load() : juce::jmin(fit, 0.9);
+    double s = keptSet ? keptScale : winsize::last("HARTERMIST", juce::jmin(fit, 0.9));
     s = juce::jlimit(0.35, fit, s);
+    sized = true;
     setSize((int)std::lround(W * s), (int)std::lround(H * s));
 }
 
@@ -1472,6 +1480,9 @@ void HartermistEditor::resized()
 {
     float s = (float)getWidth() / (float)HartermistPanel::W;
     panel.setTransform(juce::AffineTransform::scale(s));
+    if (!sized)
+        return;
     proc.uiScale = s;
     proc.uiScaleSet = true;
+    winsize::remember("HARTERMIST", (double)s);
 }
