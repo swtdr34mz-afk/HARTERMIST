@@ -36,11 +36,15 @@ endif()
 if(APPLE)
     list(APPEND HARTERMIST_FORMATS AU)
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND HARTERMIST_FORMATS LV2)
+endif()
 
 juce_add_plugin(Hartermist
     PRODUCT_NAME "HARTERMIST"
     COMPANY_NAME "swtdr34mz"
     BUNDLE_ID "com.swtdr34mz.hartermist"
+    LV2URI "https://github.com/swtdr34mz-afk/HARTERMIST"
     PLUGIN_MANUFACTURER_CODE Swtd
     PLUGIN_CODE Hrtm
     FORMATS ${HARTERMIST_FORMATS}
