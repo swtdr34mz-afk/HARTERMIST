@@ -73,6 +73,7 @@ class HartermistEditor : public juce::AudioProcessorEditor
 public:
     explicit HartermistEditor(HartermistProcessor &);
     void resized() override;
+    bool sized = false;                      /* (resizes during the constructor keep nothing) */
 
 private:
     HartermistProcessor &proc;
