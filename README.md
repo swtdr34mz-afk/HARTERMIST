@@ -27,6 +27,8 @@ Unofficial: not made, endorsed or supported by Dreadbox. Its own programs, no Ar
 xattr -cr ~/Library/Audio/Plug-Ins/VST3/HARTERMIST.vst3 ~/Library/Audio/Plug-Ins/Components/HARTERMIST.component
 ```
 
+**Linux (Bitwig, Reaper, Ardour, ...):** Die `.tar.gz` entpacken. `HARTERMIST.vst3` nach `~/.vst3/` kopieren, `HARTERMIST.lv2` nach `~/.lv2/`. Die App `HARTERMIST` startet auch ohne DAW. 64 Bit, gebaut auf Ubuntu 22.04.
+
 ## Bedienung (kurz auf Deutsch)
 
 - **ENV**: Die vier Fader sind die Filter-Hüllkurve (auch für FM mit ENV). **VCA** drücken: die Fader sind die
