@@ -124,7 +124,7 @@ void HartermistProcessor::applyProgram(const Program &p, bool toHost)
 
 void HartermistProcessor::setCurrentProgram(int index)
 {
-    if (index < 0 || index >= getNumPrograms())
+    if (index < 0 || index >= programCount())
         return;
     program = index;
     applyProgram(programAt(index), true);
@@ -140,7 +140,7 @@ juce::String HartermistProcessor::programPlace(int index) const
 
 const juce::String HartermistProcessor::getProgramName(int index)
 {
-    if (index < 0 || index >= getNumPrograms())
+    if (index < 0 || index >= programCount())
         return {};
     return programPlace(index) + " " + juce::String(programAt(index).name);
 }
@@ -475,7 +475,7 @@ void HartermistProcessor::setStateInformation(const void *data, int sizeInBytes)
         xml->removeChildElement(pg, true);
     }
     auto state = juce::ValueTree::fromXml(*xml);
-    program = juce::jlimit(0, juce::jmax(0, getNumPrograms() - 1), (int)state.getProperty("program", 0));
+    program = juce::jlimit(0, juce::jmax(0, programCount() - 1), (int)state.getProperty("program", 0));
     uiScale = (float)(double)state.getProperty("uiScale", 0.8);
     uiScaleSet = (bool)state.getProperty("uiScaleSet", false);
     sliderPage = juce::jlimit(0, 5, (int)state.getProperty("sliderPage", 0));
