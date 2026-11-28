@@ -757,7 +757,7 @@ void Panel::encoderTurn(int d)
         return;
     }
     /* the programs */
-    int n = proc.getNumPrograms();
+    int n = proc.programCount();
     proc.setCurrentProgram(((proc.getCurrentProgram() + d) % n + n) % n);
     shownParam = -1;
 }
@@ -813,7 +813,7 @@ void Panel::programMenu(juce::Rectangle<int> screen)
     for (int i = 0; i < numFactory(); i++)
         m.addItem(i + 1, proc.getProgramName(i), true, i == proc.getCurrentProgram());
     m.addSectionHeader("YOUR PROGRAMS");
-    for (int i = numFactory(); i < proc.getNumPrograms(); i++)
+    for (int i = numFactory(); i < proc.programCount(); i++)
         m.addItem(i + 1, proc.getProgramName(i), true, i == proc.getCurrentProgram());
     if (proc.userPrograms.empty())
         m.addItem(-1, "(SAVE keeps the sound as a program of your own)", false, false);
